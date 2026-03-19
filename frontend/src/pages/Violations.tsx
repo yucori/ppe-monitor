@@ -5,15 +5,34 @@ import type { Violation, Camera } from '../types'
 
 function SnapshotThumb({ violationId }: { violationId: number }) {
   const [open, setOpen] = useState(false)
-  const url = snapshotUrl(violationId)
+  const [blobUrl, setBlobUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    fetch(snapshotUrl(violationId), {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error('snapshot fetch failed')
+        return res.blob()
+      })
+      .then((blob) => setBlobUrl(URL.createObjectURL(blob)))
+      .catch(() => setBlobUrl(null))
+
+    return () => {
+      if (blobUrl) URL.revokeObjectURL(blobUrl)
+    }
+  }, [violationId])
+
+  if (!blobUrl) return null
+
   return (
     <>
       <img
-        src={url}
+        src={blobUrl}
         alt="스냅샷"
         className="w-12 h-9 object-cover rounded cursor-pointer border border-gray-700 hover:border-gray-400 transition-colors"
         onClick={() => setOpen(true)}
-        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
       />
       {open && (
         <div
@@ -21,7 +40,7 @@ function SnapshotThumb({ violationId }: { violationId: number }) {
           onClick={() => setOpen(false)}
         >
           <img
-            src={url}
+            src={blobUrl}
             alt="스냅샷 전체"
             className="max-w-[90vw] max-h-[90vh] rounded shadow-2xl border border-gray-600"
             onClick={(e) => e.stopPropagation()}
